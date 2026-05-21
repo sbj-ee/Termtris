@@ -161,13 +161,13 @@ def init_colors():
 
 def draw_board(win, game, board_top, board_left):
     # Border
-    for r in range(BOARD_ROWS + 2):
+    for r in range(BOARD_ROWS + 1):
         win.addch(board_top + r, board_left - 1, curses.ACS_VLINE)
         win.addch(board_top + r, board_left + BOARD_COLS * 2, curses.ACS_VLINE)
     for c in range(BOARD_COLS * 2 + 1):
-        win.addch(board_top + BOARD_ROWS + 1, board_left - 1 + c, curses.ACS_HLINE)
-    win.addch(board_top + BOARD_ROWS + 1, board_left - 1, curses.ACS_LLCORNER)
-    win.addch(board_top + BOARD_ROWS + 1, board_left + BOARD_COLS * 2, curses.ACS_LRCORNER)
+        win.addch(board_top + BOARD_ROWS, board_left - 1 + c, curses.ACS_HLINE)
+    win.addch(board_top + BOARD_ROWS, board_left - 1, curses.ACS_LLCORNER)
+    win.addch(board_top + BOARD_ROWS, board_left + BOARD_COLS * 2, curses.ACS_LRCORNER)
 
     # Board cells
     for r in range(BOARD_ROWS):
@@ -244,7 +244,7 @@ def main(stdscr):
     init_colors()
 
     rows, cols = stdscr.getmaxyx()
-    board_h = BOARD_ROWS + 2
+    board_h = BOARD_ROWS + 1
     board_w = BOARD_COLS * 2 + 2
     sidebar_w = 22
     total_w = board_w + sidebar_w
