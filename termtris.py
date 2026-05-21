@@ -11,7 +11,7 @@ PIECES = {
           [(3,0),(3,1),(3,2),(3,3)], [(0,1),(1,1),(2,1),(3,1)]],
     'O': [[(0,0),(0,1),(1,0),(1,1)]]*4,
     'T': [[(0,0),(0,1),(0,2),(1,1)], [(0,1),(1,1),(2,1),(1,2)],
-          [(1,0),(1,1),(1,2),(0,1)], [(0,0),(1,0),(2,0),(1,1)]],
+          [(1,0),(1,1),(1,2),(0,1)], [(0,1),(1,0),(1,1),(2,1)]],
     'S': [[(0,1),(0,2),(1,0),(1,1)], [(0,0),(1,0),(1,1),(2,1)],
           [(0,1),(0,2),(1,0),(1,1)], [(0,0),(1,0),(1,1),(2,1)]],
     'Z': [[(0,0),(0,1),(1,1),(1,2)], [(0,1),(1,0),(1,1),(2,0)],
@@ -86,12 +86,15 @@ class Game:
 
     def rotate(self):
         new_rot = (self.piece.rotation + 1) % 4
-        # Wall-kick: try center, then nudge left/right
-        for dc in (0, -1, 1, -2, 2):
-            if self._valid(self.piece, col=self.piece.col + dc, rotation=new_rot):
-                self.piece.col += dc
-                self.piece.rotation = new_rot
-                return
+        # Wall-kick: try column nudges, then upward row kicks for floor/ceiling blocks
+        for dr in (0, -1, -2, -3):
+            for dc in (0, -1, 1, -2, 2):
+                if self._valid(self.piece, row=self.piece.row + dr,
+                               col=self.piece.col + dc, rotation=new_rot):
+                    self.piece.row += dr
+                    self.piece.col += dc
+                    self.piece.rotation = new_rot
+                    return
 
     def hard_drop(self):
         while self.move(1, 0):
