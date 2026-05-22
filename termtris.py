@@ -9,7 +9,7 @@ import time
 PIECES = {
     'I': [[(0,0),(0,1),(0,2),(0,3)], [(0,2),(1,2),(2,2),(3,2)],
           [(3,0),(3,1),(3,2),(3,3)], [(0,1),(1,1),(2,1),(3,1)]],
-    'O': [[(0,0),(0,1),(1,0),(1,1)]]*4,
+    'O': [[(0,0),(0,1),(1,0),(1,1)] for _ in range(4)],
     'T': [[(0,0),(0,1),(0,2),(1,1)], [(0,1),(1,1),(2,1),(1,2)],
           [(1,0),(1,1),(1,2),(0,1)], [(0,1),(1,0),(1,1),(2,1)]],
     'S': [[(0,1),(0,2),(1,0),(1,1)], [(0,0),(1,0),(1,1),(2,1)],
@@ -226,6 +226,17 @@ def draw_sidebar(win, game, board_top, sidebar_left):
     label(22, 'Q  Quit')
 
 
+def compute_layout(rows, cols):
+    board_h = BOARD_ROWS + 1
+    board_w = BOARD_COLS * 2 + 2
+    sidebar_w = 22
+    total_w = board_w + sidebar_w
+    board_top = max(0, (rows - board_h) // 2)
+    board_left = max(1, (cols - total_w) // 2 + 1)
+    sidebar_left = board_left + board_w + 1
+    return board_top, board_left, sidebar_left
+
+
 def draw_game_over(win, rows, cols):
     msg1 = ' GAME OVER '
     msg2 = ' Press R to restart '
@@ -246,19 +257,11 @@ def main(stdscr):
     stdscr.keypad(True)
     init_colors()
 
-    rows, cols = stdscr.getmaxyx()
-    board_h = BOARD_ROWS + 1
-    board_w = BOARD_COLS * 2 + 2
-    sidebar_w = 22
-    total_w = board_w + sidebar_w
-    board_top = max(0, (rows - board_h) // 2)
-    board_left = max(1, (cols - total_w) // 2 + 1)
-    sidebar_left = board_left + board_w + 1
-
     game = Game()
 
     while True:
         rows, cols = stdscr.getmaxyx()
+        board_top, board_left, sidebar_left = compute_layout(rows, cols)
         stdscr.erase()
 
         if not game.game_over:
