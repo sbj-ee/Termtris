@@ -33,6 +33,9 @@ LEVEL_SPEEDS = [0.8, 0.7, 0.6, 0.5, 0.4, 0.35, 0.3, 0.25, 0.2, 0.15, 0.1]
 
 LINES_PER_LEVEL = 10
 
+MIN_ROWS = 23
+MIN_COLS = 46
+
 
 def level_speed(level):
     return LEVEL_SPEEDS[min(level, len(LEVEL_SPEEDS) - 1)]
@@ -61,13 +64,18 @@ class Game:
         self.score = 0
         self.lines = 0
         self.level = 0
+        self._bag = []
         self.piece = self._new_piece()
         self.next_piece = self._new_piece()
         self.game_over = False
-        self.last_drop = time.time()
+        self.last_drop = time.monotonic()
 
     def _new_piece(self):
-        return Piece(random.choice(list(PIECES.keys())))
+        # 7-bag randomizer: deal each piece once before reshuffling
+        if not self._bag:
+            self._bag = list(PIECES)
+            random.shuffle(self._bag)
+        return Piece(self._bag.pop())
 
     def _valid(self, piece, row=None, col=None, rotation=None):
         for r, c in piece.cells(row, col, rotation):
@@ -84,10 +92,13 @@ class Game:
             return True
         return False
 
-    def rotate(self):
-        new_rot = (self.piece.rotation + 1) % 4
-        # Wall-kick: try column nudges, then upward row kicks for floor/ceiling blocks
-        for dr in (0, -1, -2, -3):
+    def rotate(self, direction=1):
+        new_rot = (self.piece.rotation + direction) % 4
+        # Wall-kick: column nudges, plus upward row kicks for floor collisions.
+        # The vertical I spans 4 rows so it may need a 3-row kick; capping the
+        # others at 1 row prevents climbing the stack by spinning repeatedly.
+        row_kicks = (0, -1, -2, -3) if self.piece.name == 'I' else (0, -1)
+        for dr in row_kicks:
             for dc in (0, -1, 1, -2, 2):
                 if self._valid(self.piece, row=self.piece.row + dr,
                                col=self.piece.col + dc, rotation=new_rot):
@@ -109,16 +120,15 @@ class Game:
 
     def _lock(self):
         for r, c in self.piece.cells():
-            if 0 <= r < BOARD_ROWS and 0 <= c < BOARD_COLS:
-                self.board[r][c] = 1
-                self.board_colors[r][c] = self.piece.color
+            self.board[r][c] = 1
+            self.board_colors[r][c] = self.piece.color
         cleared = self._clear_lines()
         self._update_score(cleared)
         self.piece = self.next_piece
         self.next_piece = self._new_piece()
         if not self._valid(self.piece):
             self.game_over = True
-        self.last_drop = time.time()
+        self.last_drop = time.monotonic()
 
     def _clear_lines(self):
         full = [r for r in range(BOARD_ROWS) if all(self.board[r])]
@@ -136,7 +146,7 @@ class Game:
         self.level = self.lines // LINES_PER_LEVEL
 
     def tick(self):
-        now = time.time()
+        now = time.monotonic()
         if now - self.last_drop >= level_speed(self.level):
             if not self.move(1, 0):
                 self._lock()
@@ -186,15 +196,13 @@ def draw_board(win, game, board_top, board_left):
     ghost = set(game.ghost_cells())
     active = set(game.piece.cells())
     for r, c in ghost - active:
-        if 0 <= r < BOARD_ROWS:
-            win.addstr(board_top + r, board_left + c * 2,
-                       '::',  curses.color_pair(8))
+        win.addstr(board_top + r, board_left + c * 2,
+                   '::', curses.color_pair(8) | curses.A_DIM)
 
     # Active piece
     for r, c in game.piece.cells():
-        if 0 <= r < BOARD_ROWS:
-            win.addstr(board_top + r, board_left + c * 2,
-                       '[]', curses.color_pair(game.piece.color) | curses.A_BOLD)
+        win.addstr(board_top + r, board_left + c * 2,
+                   '[]', curses.color_pair(game.piece.color) | curses.A_BOLD)
 
 
 def draw_sidebar(win, game, board_top, sidebar_left):
@@ -202,11 +210,11 @@ def draw_sidebar(win, game, board_top, sidebar_left):
         win.addstr(board_top + row, sidebar_left, text)
 
     label(0, 'TERMTRIS')
-    label(2, f'Score')
+    label(2, 'Score')
     label(3, f'{game.score:>8}')
-    label(5, f'Lines')
+    label(5, 'Lines')
     label(6, f'{game.lines:>8}')
-    label(8, f'Level')
+    label(8, 'Level')
     label(9, f'{game.level:>8}')
 
     label(11, 'Next:')
@@ -220,10 +228,10 @@ def draw_sidebar(win, game, board_top, sidebar_left):
 
     label(17, 'Controls:')
     label(18, '← → Move')
-    label(19, '↑  Rotate')
+    label(19, '↑ X Z Rotate')
     label(20, '↓  Soft drop')
     label(21, 'SPC Hard drop')
-    label(22, 'Q  Quit')
+    label(22, 'P Pause  Q Quit')
 
 
 def compute_layout(rows, cols):
@@ -251,20 +259,42 @@ def draw_game_over(win, rows, cols):
     win.addstr(r + 2, c3, msg3, attr)
 
 
+def draw_paused(win, rows, cols):
+    msg = ' PAUSED '
+    win.addstr(rows // 2, (cols - len(msg)) // 2, msg,
+               curses.color_pair(9) | curses.A_BOLD)
+
+
 def main(stdscr):
     curses.curs_set(0)
-    stdscr.nodelay(True)
+    stdscr.timeout(20)  # getch blocks up to 20 ms — paces the loop without spinning
     stdscr.keypad(True)
     init_colors()
 
     game = Game()
+    paused = False
 
     while True:
         rows, cols = stdscr.getmaxyx()
-        board_top, board_left, sidebar_left = compute_layout(rows, cols)
         stdscr.erase()
 
-        if not game.game_over:
+        if rows < MIN_ROWS or cols < MIN_COLS:
+            msg = f'Terminal too small (need {MIN_COLS}x{MIN_ROWS})'
+            try:
+                stdscr.addstr(rows // 2, max(0, (cols - len(msg)) // 2), msg)
+            except curses.error:
+                pass
+            stdscr.refresh()
+            game.last_drop = time.monotonic()  # hold gravity while unreadable
+            if stdscr.getch() in (ord('q'), ord('Q')):
+                break
+            continue
+
+        board_top, board_left, sidebar_left = compute_layout(rows, cols)
+
+        if paused:
+            game.last_drop = time.monotonic()  # hold gravity while paused
+        elif not game.game_over:
             game.tick()
 
         try:
@@ -272,31 +302,39 @@ def main(stdscr):
             draw_sidebar(stdscr, game, board_top, sidebar_left)
             if game.game_over:
                 draw_game_over(stdscr, rows, cols)
+            elif paused:
+                draw_paused(stdscr, rows, cols)
         except curses.error:
             pass  # ignore draws outside terminal bounds
 
         stdscr.refresh()
 
         key = stdscr.getch()
-        if key == ord('q') or key == ord('Q'):
+        if key in (ord('q'), ord('Q')):
             break
         if game.game_over:
-            if key == ord('r') or key == ord('R'):
+            if key in (ord('r'), ord('R')):
                 game = Game()
+                paused = False
+            continue
+        if key in (ord('p'), ord('P')):
+            paused = not paused
+            continue
+        if paused:
             continue
 
         if key == curses.KEY_LEFT:
             game.move(0, -1)
         elif key == curses.KEY_RIGHT:
             game.move(0, 1)
-        elif key == curses.KEY_UP:
-            game.rotate()
+        elif key in (curses.KEY_UP, ord('x'), ord('X')):
+            game.rotate(1)
+        elif key in (ord('z'), ord('Z')):
+            game.rotate(-1)
         elif key == curses.KEY_DOWN:
             game.soft_drop()
         elif key == ord(' '):
             game.hard_drop()
-
-        time.sleep(0.02)
 
 
 if __name__ == '__main__':

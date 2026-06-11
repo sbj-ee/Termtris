@@ -17,9 +17,11 @@ python3 termtris.py
 | Key | Action |
 |-----|--------|
 | `←` `→` | Move piece left / right |
-| `↑` | Rotate piece |
+| `↑` `X` | Rotate clockwise |
+| `Z` | Rotate counterclockwise |
 | `↓` | Soft drop |
 | `Space` | Hard drop |
+| `P` | Pause / resume |
 | `R` | Restart (after game over) |
 | `Q` | Quit |
 
@@ -39,7 +41,9 @@ Speed increases every 10 lines, up to level 10.
 ## Features
 
 - All 7 standard tetrominoes (I, O, T, S, Z, J, L) in distinct colors
+- 7-bag randomizer (each piece appears once per 7 spawns)
 - Ghost piece showing landing position
 - Next piece preview
-- Wall-kick rotation
+- Wall-kick rotation, clockwise and counterclockwise
+- Pause
 - 10 difficulty levels
