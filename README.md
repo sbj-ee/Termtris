@@ -27,8 +27,8 @@ python3 termtris.py
 
 ## Scoring
 
-| Lines cleared | Points (× level) |
-|---------------|-----------------|
+| Lines cleared | Points (× level + 1) |
+|---------------|---------------------|
 | 1 | 100 |
 | 2 | 300 |
 | 3 | 500 |
@@ -36,7 +36,7 @@ python3 termtris.py
 
 Soft drop awards 1 point per row; hard drop awards 2 points per row.
 
-Speed increases every 10 lines, up to level 10.
+Levels start at 0 and increase every 10 lines. Drop speed increases with each level and caps at level 10.
 
 ## Features
 
@@ -46,4 +46,14 @@ Speed increases every 10 lines, up to level 10.
 - Next piece preview
 - Wall-kick rotation, clockwise and counterclockwise
 - Pause
-- 10 difficulty levels
+- 11 speed levels (0–10)
+- Adapts to terminal resize
+
+## Development
+
+The repo uses [pre-commit](https://pre-commit.com/) with [gitleaks](https://github.com/gitleaks/gitleaks) to scan for secrets before each commit:
+
+```bash
+pip install pre-commit
+pre-commit install
+```
